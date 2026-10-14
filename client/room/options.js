@@ -1,12 +1,11 @@
-// options.js
 module.exports = {
     options: [
         {
             id: "single_team_mode",
             name: "Режим одной команды (Синяя)",
             type: "boolean",
-            defaultValue: true, // По умолчанию включено
-            description: "Все игроки попадают в синюю команду автоматически."
+            defaultValue: true,
+            description: "Все игроки автоматически попадают в синюю команду."
         },
         {
             id: "infinite_time",
