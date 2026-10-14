@@ -1,4 +1,3 @@
-// gamemode.js
 const RoomAPI = require('RoomAPI');
 const PlayerAPI = require('PlayerAPI');
 const ZoneAPI = require('ZoneAPI');
@@ -9,13 +8,6 @@ let serverStartTime = Date.now();
 let firstPlayerAdm = false;
 let players = new Map();
 let nextPlayerID = 1;
-let spawnPoint = { x: 0, y: 0, z: 0 };
-
-// Получаем настройки из options.js
-const options = require('./options.js').options.reduce((acc, opt) => {
-    acc[opt.id] = opt.defaultValue;
-    return acc;
-}, {});
 
 class PlayerData {
     constructor(id, playerObj) {
@@ -31,14 +23,17 @@ class PlayerData {
 }
 
 function onInit() {
-    // Применяем настройки из options.js
-    if (options.infinite_time) {
+    // Получаем актуальные значения опций из интерфейса режима
+    const singleTeamMode = RoomAPI.getOption("single_team_mode");
+    const infiniteTime = RoomAPI.getOption("infinite_time");
+
+    if (infiniteTime) {
         RoomAPI.setInfiniteTime(true);
     }
-    
+
     UIAPI.enablePopups(true);
     
-    // Настройка колонок таблицы (как на фото)
+    // Настройка заголовков таблицы (как на фото)
     UIAPI.setColumnLabel('K', 'статусы!');
     UIAPI.setColumnLabel('D', 'R - рум айди');
     UIAPI.setColumnLabel('S', 'монеты!');
@@ -52,19 +47,19 @@ function onPlayerJoin(player) {
     let data = new PlayerData(id, player);
     players.set(id, data);
 
-    // --- ЛОГИКА КОМАНД (СВЯЗЬ С default_teams.js) ---
-    if (options.single_team_mode) {
-        // Принудительно ставим в команду с ID 1 (Синяя команда из default_teams.js)
+    // --- ЛОГИКА КОМАНД ---
+    // Проверяем опцию. Если true -> ставим в команду 1 (Синяя)
+    if (RoomAPI.getOption("single_team_mode")) {
         player.setTeam(1); 
-        ChatAPI.sendSystemMessage(`Игрок \${id} добавлен в Синюю Команду.`);
+        // Опционально: можно отправить системное сообщение только админу или в чат
     }
-    // --------------------------------------------------
+    // ----------------------
 
     if (!firstPlayerAdm) {
         data.hasAdmin = true;
         firstPlayerAdm = true;
         grantAdminPermissions(data);
-        ChatAPI.sendSystemMessage(`Игрок \${id} получил права администратора.`);
+        ChatAPI.sendSystemMessage(`Игрок #\${id} получил права администратора.`);
     }
 
     UIAPI.addPlayerToList(id, data.status, id, data.coins, data.kills);
@@ -102,6 +97,7 @@ function onZoneEnter(zone, player) {
             }
         } 
         else if (tag === 'weapon') {
+            // Формат в редакторе: Тип@Цена (например: 5@100)
             let parts = name.split('@');
             if (parts.length === 2) {
                 let type = parseInt(parts);
@@ -110,6 +106,7 @@ function onZoneEnter(zone, player) {
             }
         }
         else if (tag === 'xp') {
+            // Формат: HP@Цена (например: 50@200)
             let parts = name.split('@');
             if (parts.length === 2) {
                 let hp = parseInt(parts);
@@ -121,18 +118,20 @@ function onZoneEnter(zone, player) {
             UIAPI.showPopup(player, name, 3);
         }
         else if (tag === 'status') {
+            // Формат: Цвет@Название@Цена (например: red@VIP@500)
             let parts = name.split('@');
             if (parts.length === 3) {
                 buyStatus(data, parts, parts, parseInt(parts));
             }
         }
         else if (tag === 'status2') {
+            // Формат: ТребуемыйСтатус (например: VIP)
             let parts = name.split('@');
-            if (parts.length === 2) {
-                checkStatusAccess(data, parts, zone);
-            }
+            // Берем первое значение как требуемый статус
+            checkStatusAccess(data, parts, zone);
         }
         else if (tag === 'tp') {
+            // Формат: X@Y@Z (например: 10@20@30)
             let coords = name.split('@').map(Number);
             if (coords.length === 3) {
                 data.obj.teleport(coords, coords, coords);
@@ -183,7 +182,9 @@ function buyStatus(data, color, name, price) {
 
 function checkStatusAccess(data, requiredStatus, zone) {
     if (data.status !== requiredStatus) {
-        data.obj.teleport(spawnPoint.x, spawnPoint.y, spawnPoint.z);
+        // Телепорт на спавн (координаты берутся из default_teams.js или дефолтные)
+        // Для простоты телепортируем в 0,0,0. Лучше вынести спавн в переменную.
+        data.obj.teleport(0, 0, 0);
         UIAPI.showPopup(data.obj, "Нет доступа к этой зоне!", 3);
     }
 }
@@ -199,11 +200,11 @@ function onChatMessage(player, message) {
 
     if (cmd === 'tp') {
         if (args.length >= 3) {
-            let targetID = parseInt(args);
+            let targetID = parseInt(args); // Аргументы: tp, A, B -> args это B
             let targetData = players.get(targetID);
             if (targetData) {
                 targetData.obj.teleport(data.obj.getPosition());
-                ChatAPI.sendSystemMessage(`Игрок ${targetID} телепортирован к игроку ${data.id}.`);
+                ChatAPI.sendSystemMessage(`Игрок #${targetID} телепортирован к игроку #${data.id}.`);
             }
         }
     }
@@ -218,7 +219,7 @@ function onChatMessage(player, message) {
             let targetID = parseInt(args);
             let targetData = players.get(targetID);
             if (targetData) {
-                targetData.obj.teleport(spawnPoint.x, spawnPoint.y, spawnPoint.z);
+                targetData.obj.teleport(0, 0, 0);
             }
         }
     }
@@ -229,7 +230,7 @@ function onChatMessage(player, message) {
             if (targetData) {
                 targetData.hasAdmin = true;
                 grantAdminPermissions(targetData);
-                ChatAPI.sendSystemMessage(`Админка выдана игроку \${targetID}.`);
+                ChatAPI.sendSystemMessage(`Админка выдана игроку #\${targetID}.`);
             }
         }
     }
