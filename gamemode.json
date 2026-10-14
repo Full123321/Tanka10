@@ -1,0 +1,7 @@
+{
+  "name": "тэст",
+  "version": "1.0.0",
+  "author": "Tyanochka",
+  "entryPoint": "gamemode.js",
+  "apiVersion": "2.0"
+}
