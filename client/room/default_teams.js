@@ -1,4 +1,3 @@
-// default_teams.js
 module.exports = [
     {
         id: 1,
